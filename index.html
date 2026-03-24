@@ -77,12 +77,9 @@ const db = getFirestore(app);
 
 let userId = null;
 let currentEnvelopeId = null;
-
-// Store balance spans for instant updates
 let envelopeSpans = {};
 
 document.addEventListener("DOMContentLoaded", () => {
-
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const authError = document.getElementById("authError");
@@ -121,7 +118,6 @@ authError.innerText = err.message;
 
 logoutBtn.addEventListener("click", async () => { await signOut(auth); });
 
-// AUTH STATE
 onAuthStateChanged(auth, (user) => {
 if(user){
 userId = user.uid;
@@ -146,7 +142,7 @@ alert("Error adding envelope: " + err.message);
 }
 });
 
-// Render envelopes with instant balance update support
+// RENDER ENVELOPES
 async function renderEnvelopes() {
 const envelopesRef = collection(db, "users", userId, "envelopes");
 onSnapshot(envelopesRef, snapshot => {
@@ -170,22 +166,28 @@ div.appendChild(balanceSpan);
 
 envelopeSpans[docSnap.id] = balanceSpan;
 
-div.onclick = () => openModal(docSnap.id, env);
+div.onclick = () => openModal(docSnap.id);
 container.appendChild(div);
 });
 document.getElementById("total").innerText = "$" + total.toFixed(2) + " Total";
 });
 }
 
-// MODAL
-function openModal(id, env) {
+// OPEN MODAL WITH FRESH DATA
+async function openModal(id) {
 currentEnvelopeId = id;
+const envRef = doc(db, "users", userId, "envelopes", id);
+const envSnap = await getDoc(envRef);
+if (!envSnap.exists()) return;
+
+const env = envSnap.data();
 modal.style.display = "flex";
 modalBalance.innerText = env.balance.toFixed(2);
 amountInput.value = "";
 noteInput.value = "";
 renderHistory(env.history || []);
 }
+
 function closeModal() { modal.style.display = "none"; }
 closeModalBtn.addEventListener("click", closeModal);
 
@@ -205,10 +207,12 @@ const amount = parseFloat(amountInput.value);
 if(isNaN(amount) || amount <= 0){ alert("Enter valid amount"); return; }
 const note = noteInput.value;
 
+// Update modal
 const modalCurrent = parseFloat(modalBalance.innerText);
 const newBalance = isAdd ? modalCurrent + amount : modalCurrent - amount;
 modalBalance.innerText = newBalance.toFixed(2);
 
+// Update history
 const newEntry = {
 type: isAdd ? "+" : "-",
 amount,
@@ -216,7 +220,6 @@ note,
 date: new Date().toLocaleDateString(),
 balance: newBalance
 };
-
 const p = document.createElement('p');
 p.innerHTML = `${newEntry.date} - ${newEntry.type} $${newEntry.amount.toFixed(2)}${note ? ' - '+note : ''} (Balance: $${newEntry.balance.toFixed(2)})`;
 historyDiv.prepend(p);
@@ -227,7 +230,7 @@ envelopeSpans[currentEnvelopeId].innerText = `$${newBalance.toFixed(2)}`;
 envelopeSpans[currentEnvelopeId].className = newBalance < 0 ? "negative" : "";
 }
 
-// Firestore update in background
+// Save to Firestore
 const envRef = doc(db,"users",userId,"envelopes",currentEnvelopeId);
 const envSnap = await getDoc(envRef);
 let envData = envSnap.exists()? envSnap.data() : {balance:0,history:[]};
