@@ -4,7 +4,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Envelope Budget App</title>
+<style>
+body { font-family: Arial; margin:0; background:#f7f7f7; }
+header { text-align:center; padding:1rem; background:#4CAF50; color:white; }
+.container { padding:15px; }
+input, button { width:100%; padding:12px; margin:6px 0; font-size:1rem; }
+.envelope { background:white; padding:15px; border-radius:10px; margin:8px 0; cursor:pointer; box-shadow:0 3px 6px rgba(0,0,0,0.1);}
+.negative { color:red; }
+#app { display:none; }
 
+/* MODAL */
+#modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+#modalContent { background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; }
+#modalContent input { width:100%; margin:5px 0; padding:8px; }
+#history { max-height:200px; overflow-y:auto; margin-top:10px; border-top:1px solid #ddd; padding-top:10px; }
+#modalContent button { margin:5px 0; padding:10px; width:100%; font-size:1rem; }
+</style>
+</head>
+<body>
+<header>Envelope Budget App</header>
+
+<!-- LOGIN -->
+<div class="container" id="auth">
+<h3>Login / Sign Up</h3>
+<input id="emailInput" placeholder="Email">
+<input id="passwordInput" type="password" placeholder="Password">
+<button id="signupBtn">Sign Up</button>
+<button id="loginBtn">Login</button>
+<p id="authError" style="color:red;"></p>
+</div>
+
+<!-- APP -->
+<div class="container" id="app">
+<button id="logoutBtn">Logout</button>
+<h3 id="total">$0.00 Total</h3>
+<div id="envelopes"></div>
+<button id="addEnvelopeBtn">+ Add Envelope</button>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+<div id="modalContent">
+<h4>Balance: $<span id="modalBalance">0</span></h4>
+<input id="amountInput" placeholder="Amount" type="number">
+<input id="noteInput" placeholder="Optional Note">
+<button id="addMoneyBtn">Add Money</button>
+<button id="spendMoneyBtn">Spend Money</button>
+<div id="history"></div>
+<button id="closeModalBtn">Close</button>
+</div>
+</div>
+
+<!-- JS -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -28,6 +79,9 @@ const db = getFirestore(app);
 let userId = null;
 let currentEnvelopeId = null;
 
+// Wait for DOM
+document.addEventListener("DOMContentLoaded", () => {
+
 // Elements
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
@@ -35,22 +89,34 @@ const authError = document.getElementById("authError");
 const signupBtn = document.getElementById("signupBtn");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
+const addEnvelopeBtn = document.getElementById("addEnvelopeBtn");
 
 const modal = document.getElementById("modal");
 const modalBalance = document.getElementById("modalBalance");
 const amountInput = document.getElementById("amountInput");
 const noteInput = document.getElementById("noteInput");
 const historyDiv = document.getElementById("history");
+const addMoneyBtn = document.getElementById("addMoneyBtn");
+const spendMoneyBtn = document.getElementById("spendMoneyBtn");
+const closeModalBtn = document.getElementById("closeModalBtn");
 
 // AUTH
 signupBtn.addEventListener("click", async () => {
-try { await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value); authError.innerText = ""; }
-catch(err){ authError.innerText = err.message; }
+try {
+await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+authError.innerText = "";
+} catch(err){
+authError.innerText = err.message;
+}
 });
 
 loginBtn.addEventListener("click", async () => {
-try { await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value); authError.innerText = ""; }
-catch(err){ authError.innerText = err.message; }
+try {
+await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+authError.innerText = "";
+} catch(err){
+authError.innerText = err.message;
+}
 });
 
 logoutBtn.addEventListener("click", async () => { await signOut(auth); });
@@ -65,6 +131,18 @@ renderEnvelopes();
 } else {
 document.getElementById("auth").style.display = "block";
 document.getElementById("app").style.display = "none";
+}
+});
+
+// ADD ENVELOPE
+addEnvelopeBtn.addEventListener("click", async () => {
+const name = prompt("Envelope name?");
+if(!name) return;
+const envelopesRef = collection(db, "users", userId, "envelopes");
+try {
+await addDoc(envelopesRef, { name, balance: 0, history: [] });
+} catch(err) {
+alert("Error adding envelope: " + err.message);
 }
 });
 
@@ -88,18 +166,6 @@ document.getElementById("total").innerText = "$" + total.toFixed(2) + " Total";
 });
 }
 
-// ADD ENVELOPE (fixed with addDoc)
-async function addEnvelope() {
-const name = prompt("Envelope name?");
-if(!name) return;
-const envelopesRef = collection(db, "users", userId, "envelopes");
-try {
-await addDoc(envelopesRef, { name, balance: 0, history: [] });
-} catch(err) {
-alert("Error adding envelope: " + err.message);
-}
-}
-
 // MODAL
 function openModal(id, env) {
 currentEnvelopeId = id;
@@ -110,14 +176,19 @@ noteInput.value = "";
 renderHistory(env.history || []);
 }
 function closeModal() { modal.style.display = "none"; }
+closeModalBtn.addEventListener("click", closeModal);
 
 function renderHistory(history) {
-if(!history || history.length===0){ historyDiv.innerHTML="<p>No transactions yet.</p>"; return; }
+if(!history || history.length===0){
+historyDiv.innerHTML="<p>No transactions yet.</p>";
+return;
+}
 historyDiv.innerHTML = history.slice().reverse().map(h => `<p>${h.date} - ${h.type} $${h.amount.toFixed(2)} ${h.note?'- '+h.note:''} (Balance: $${h.balance.toFixed(2)})</p>`).join('');
 }
 
-async function addMoney(){ await changeBalance(true); }
-async function spendMoney(){ await changeBalance(false); }
+addMoneyBtn.addEventListener("click", () => changeBalance(true));
+spendMoneyBtn.addEventListener("click", () => changeBalance(false));
+
 async function changeBalance(isAdd){
 const amount = parseFloat(amountInput.value);
 if(isNaN(amount) || amount<=0){ alert("Enter valid amount"); return; }
@@ -131,58 +202,8 @@ await setDoc(envRef, envData);
 modalBalance.innerText = envData.balance.toFixed(2);
 renderHistory(envData.history);
 }
+
+});
 </script>
-
-<style>
-body { font-family: Arial; margin:0; background:#f7f7f7; }
-header { text-align:center; padding:1rem; background:#4CAF50; color:white; }
-.container { padding:15px; }
-input, button { width:100%; padding:12px; margin:6px 0; font-size:1rem; }
-.envelope { background:white; padding:15px; border-radius:10px; margin:8px 0; cursor:pointer; box-shadow:0 3px 6px rgba(0,0,0,0.1);}
-.negative { color:red; }
-#app { display:none; }
-
-/* MODAL */
-#modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-#modalContent { background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; }
-#modalContent input { width:100%; margin:5px 0; padding:8px; }
-#history { max-height:200px; overflow-y:auto; margin-top:10px; border-top:1px solid #ddd; padding-top:10px; }
-#modalContent button { margin:5px 0; padding:10px; width:100%; font-size:1rem; }
-</style>
-
-<body>
-<header>Envelope Budget App</header>
-
-<!-- LOGIN -->
-<div class="container" id="auth">
-<h3>Login / Sign Up</h3>
-<input id="emailInput" placeholder="Email">
-<input id="passwordInput" type="password" placeholder="Password">
-<button id="signupBtn">Sign Up</button>
-<button id="loginBtn">Login</button>
-<p id="authError" style="color:red;"></p>
-</div>
-
-<!-- APP -->
-<div class="container" id="app">
-<button id="logoutBtn">Logout</button>
-<h3 id="total">$0.00 Total</h3>
-<div id="envelopes"></div>
-<button onclick="addEnvelope()">+ Add Envelope</button>
-</div>
-
-<!-- MODAL -->
-<div id="modal">
-<div id="modalContent">
-<h4>Balance: $<span id="modalBalance">0</span></h4>
-<input id="amountInput" placeholder="Amount" type="number">
-<input id="noteInput" placeholder="Optional Note">
-<button onclick="addMoney()">Add Money</button>
-<button onclick="spendMoney()">Spend Money</button>
-<div id="history"></div>
-<button onclick="closeModal()">Close</button>
-</div>
-</div>
-
 </body>
 </html>
