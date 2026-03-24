@@ -22,7 +22,7 @@ top:0; left:0; right:0; bottom:0;
 background:rgba(0,0,0,0.5);
 justify-content:center;
 align-items:center;
-z-index: 1000;
+z-index:1000;
 }
 #modalContent { background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; }
 #history { max-height:200px; overflow-y:auto; margin-top:10px; border-top:1px solid #ddd; padding-top:10px; }
@@ -68,9 +68,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Firebase
+// Firebase config
 const firebaseConfig = {
-apiKey: "AIzaSyCkQ6YSSkvgPVEzHQz-UPeyJRiFqDX18Ug",
+apiKey: "YOUR_API_KEY",
 authDomain: "budget-app-51260.firebaseapp.com",
 projectId: "budget-app-51260",
 };
@@ -83,12 +83,15 @@ let userId = null;
 let currentEnvelopeId = null;
 let envelopeSpans = {};
 
-// DOM Ready
 document.addEventListener("DOMContentLoaded", () => {
+
+const authDiv = document.getElementById("auth");
+const appDiv = document.getElementById("app");
 
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const authError = document.getElementById("authError");
+
 const signupBtn = document.getElementById("signupBtn");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
@@ -129,11 +132,11 @@ logoutBtn.onclick = () => signOut(auth);
 onAuthStateChanged(auth, (user) => {
 if(user){
 userId = user.uid;
-auth.style.display = "none";
+authDiv.style.display = "none";
 appDiv.style.display = "block";
 renderEnvelopes();
 } else {
-auth.style.display = "block";
+authDiv.style.display = "block";
 appDiv.style.display = "none";
 }
 });
@@ -187,7 +190,7 @@ document.getElementById("total").innerText = "$" + total.toFixed(2) + " Total";
 });
 }
 
-// OPEN MODAL (fresh data)
+// OPEN MODAL
 async function openModal(id){
 currentEnvelopeId = id;
 const snap = await getDoc(doc(db,"users",userId,"envelopes",id));
@@ -212,7 +215,7 @@ historyDiv.innerHTML = history.slice().reverse().map(h =>
 ).join("");
 }
 
-// CHANGE BALANCE (instant UI)
+// CHANGE BALANCE
 async function changeBalance(isAdd){
 const amount = parseFloat(amountInput.value);
 if(!amount) return;
@@ -237,6 +240,7 @@ historyDiv.innerHTML = `<p>${entry.date} ${entry.type}$${entry.amount}</p>` + hi
 const ref = doc(db,"users",userId,"envelopes",currentEnvelopeId);
 const snap = await getDoc(ref);
 const data = snap.data();
+
 data.balance = newBal;
 data.history.push(entry);
 
