@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Envelope Budget App</title>
+
 <style>
 body { font-family: Arial; margin:0; background:#f7f7f7; }
 header { text-align:center; padding:1rem; background:#4CAF50; color:white; }
@@ -14,13 +15,20 @@ input, button { width:100%; padding:12px; margin:6px 0; font-size:1rem; }
 #app { display:none; }
 
 /* MODAL */
-#modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+#modal {
+display:none;
+position:fixed;
+top:0; left:0; right:0; bottom:0;
+background:rgba(0,0,0,0.5);
+justify-content:center;
+align-items:center;
+z-index: 1000;
+}
 #modalContent { background:white; padding:20px; border-radius:10px; width:90%; max-width:400px; }
-#modalContent input { width:100%; margin:5px 0; padding:8px; }
 #history { max-height:200px; overflow-y:auto; margin-top:10px; border-top:1px solid #ddd; padding-top:10px; }
-#modalContent button { margin:5px 0; padding:10px; width:100%; font-size:1rem; }
 </style>
 </head>
+
 <body>
 <header>Envelope Budget App</header>
 
@@ -60,15 +68,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Firebase config
+// Firebase
 const firebaseConfig = {
 apiKey: "AIzaSyCkQ6YSSkvgPVEzHQz-UPeyJRiFqDX18Ug",
 authDomain: "budget-app-51260.firebaseapp.com",
-databaseURL: "https://budget-app-51260-default-rtdb.firebaseio.com",
 projectId: "budget-app-51260",
-storageBucket: "budget-app-51260.firebasestorage.app",
-messagingSenderId: "378506546234",
-appId: "1:378506546234:web:aa8c4be92bc5c736a8f903"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -79,7 +83,9 @@ let userId = null;
 let currentEnvelopeId = null;
 let envelopeSpans = {};
 
+// DOM Ready
 document.addEventListener("DOMContentLoaded", () => {
+
 const emailInput = document.getElementById("emailInput");
 const passwordInput = document.getElementById("passwordInput");
 const authError = document.getElementById("authError");
@@ -93,63 +99,63 @@ const modalBalance = document.getElementById("modalBalance");
 const amountInput = document.getElementById("amountInput");
 const noteInput = document.getElementById("noteInput");
 const historyDiv = document.getElementById("history");
+
 const addMoneyBtn = document.getElementById("addMoneyBtn");
 const spendMoneyBtn = document.getElementById("spendMoneyBtn");
 const closeModalBtn = document.getElementById("closeModalBtn");
 
 // AUTH
-signupBtn.addEventListener("click", async () => {
+signupBtn.onclick = async () => {
 try {
 await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
 authError.innerText = "";
-} catch(err){
-authError.innerText = err.message;
+} catch(e) {
+authError.innerText = e.message;
 }
-});
+};
 
-loginBtn.addEventListener("click", async () => {
+loginBtn.onclick = async () => {
 try {
 await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
 authError.innerText = "";
-} catch(err){
-authError.innerText = err.message;
+} catch(e) {
+authError.innerText = e.message;
 }
-});
+};
 
-logoutBtn.addEventListener("click", async () => { await signOut(auth); });
+logoutBtn.onclick = () => signOut(auth);
 
+// AUTH STATE
 onAuthStateChanged(auth, (user) => {
 if(user){
 userId = user.uid;
-document.getElementById("auth").style.display = "none";
-document.getElementById("app").style.display = "block";
+auth.style.display = "none";
+appDiv.style.display = "block";
 renderEnvelopes();
 } else {
-document.getElementById("auth").style.display = "block";
-document.getElementById("app").style.display = "none";
+auth.style.display = "block";
+appDiv.style.display = "none";
 }
 });
 
 // ADD ENVELOPE
-addEnvelopeBtn.addEventListener("click", async () => {
+addEnvelopeBtn.onclick = async () => {
 const name = prompt("Envelope name?");
 if(!name) return;
-const envelopesRef = collection(db, "users", userId, "envelopes");
-try {
-await addDoc(envelopesRef, { name, balance: 0, history: [] });
-} catch(err) {
-alert("Error adding envelope: " + err.message);
-}
+await addDoc(collection(db,"users",userId,"envelopes"), {
+name, balance:0, history:[]
 });
+};
 
 // RENDER ENVELOPES
-async function renderEnvelopes() {
-const envelopesRef = collection(db, "users", userId, "envelopes");
-onSnapshot(envelopesRef, snapshot => {
+function renderEnvelopes(){
+const ref = collection(db,"users",userId,"envelopes");
+onSnapshot(ref, snapshot => {
 const container = document.getElementById("envelopes");
 container.innerHTML = "";
 envelopeSpans = {};
 let total = 0;
+
 snapshot.forEach(docSnap => {
 const env = docSnap.data();
 total += env.balance;
@@ -157,89 +163,91 @@ total += env.balance;
 const div = document.createElement("div");
 div.className = "envelope";
 
-const balanceSpan = document.createElement("span");
-balanceSpan.className = env.balance < 0 ? "negative" : "";
-balanceSpan.innerText = `$${env.balance.toFixed(2)}`;
+const nameEl = document.createElement("b");
+nameEl.innerText = env.name;
 
-div.innerHTML = `<b>${env.name}</b><br>`;
+const br = document.createElement("br");
+
+const balanceSpan = document.createElement("span");
+balanceSpan.innerText = `$${env.balance.toFixed(2)}`;
+if(env.balance < 0) balanceSpan.className = "negative";
+
+div.appendChild(nameEl);
+div.appendChild(br);
 div.appendChild(balanceSpan);
 
 envelopeSpans[docSnap.id] = balanceSpan;
 
-div.onclick = () => openModal(docSnap.id);
+div.addEventListener("click", () => openModal(docSnap.id));
+
 container.appendChild(div);
 });
+
 document.getElementById("total").innerText = "$" + total.toFixed(2) + " Total";
 });
 }
 
-// OPEN MODAL WITH FRESH DATA
-async function openModal(id) {
+// OPEN MODAL (fresh data)
+async function openModal(id){
 currentEnvelopeId = id;
-const envRef = doc(db, "users", userId, "envelopes", id);
-const envSnap = await getDoc(envRef);
-if (!envSnap.exists()) return;
+const snap = await getDoc(doc(db,"users",userId,"envelopes",id));
+const env = snap.data();
 
-const env = envSnap.data();
 modal.style.display = "flex";
 modalBalance.innerText = env.balance.toFixed(2);
-amountInput.value = "";
-noteInput.value = "";
 renderHistory(env.history || []);
 }
 
-function closeModal() { modal.style.display = "none"; }
-closeModalBtn.addEventListener("click", closeModal);
+// CLOSE MODAL
+closeModalBtn.onclick = () => modal.style.display = "none";
 
-function renderHistory(history) {
-if(!history || history.length===0){
-historyDiv.innerHTML="<p>No transactions yet.</p>";
+// HISTORY
+function renderHistory(history){
+if(!history.length){
+historyDiv.innerHTML = "<p>No transactions</p>";
 return;
 }
-historyDiv.innerHTML = history.slice().reverse().map(h => `<p>${h.date} - ${h.type} $${h.amount.toFixed(2)} ${h.note?'- '+h.note:''} (Balance: $${h.balance.toFixed(2)})</p>`).join('');
+historyDiv.innerHTML = history.slice().reverse().map(h =>
+`<p>${h.date} - ${h.type} $${h.amount} (Bal: $${h.balance})</p>`
+).join("");
 }
 
-addMoneyBtn.addEventListener("click", () => changeBalance(true));
-spendMoneyBtn.addEventListener("click", () => changeBalance(false));
-
+// CHANGE BALANCE (instant UI)
 async function changeBalance(isAdd){
 const amount = parseFloat(amountInput.value);
-if(isNaN(amount) || amount <= 0){ alert("Enter valid amount"); return; }
-const note = noteInput.value;
+if(!amount) return;
 
-// Update modal
-const modalCurrent = parseFloat(modalBalance.innerText);
-const newBalance = isAdd ? modalCurrent + amount : modalCurrent - amount;
-modalBalance.innerText = newBalance.toFixed(2);
+let current = parseFloat(modalBalance.innerText);
+let newBal = isAdd ? current + amount : current - amount;
+modalBalance.innerText = newBal.toFixed(2);
 
-// Update history
-const newEntry = {
-type: isAdd ? "+" : "-",
-amount,
-note,
-date: new Date().toLocaleDateString(),
-balance: newBalance
-};
-const p = document.createElement('p');
-p.innerHTML = `${newEntry.date} - ${newEntry.type} $${newEntry.amount.toFixed(2)}${note ? ' - '+note : ''} (Balance: $${newEntry.balance.toFixed(2)})`;
-historyDiv.prepend(p);
-
-// Update envelope button instantly
 if(envelopeSpans[currentEnvelopeId]){
-envelopeSpans[currentEnvelopeId].innerText = `$${newBalance.toFixed(2)}`;
-envelopeSpans[currentEnvelopeId].className = newBalance < 0 ? "negative" : "";
+envelopeSpans[currentEnvelopeId].innerText = `$${newBal.toFixed(2)}`;
 }
 
-// Save to Firestore
-const envRef = doc(db,"users",userId,"envelopes",currentEnvelopeId);
-const envSnap = await getDoc(envRef);
-let envData = envSnap.exists()? envSnap.data() : {balance:0,history:[]};
-envData.balance = newBalance;
-envData.history.push(newEntry);
-await setDoc(envRef, envData);
+const entry = {
+type: isAdd?"+":"-",
+amount,
+date:new Date().toLocaleDateString(),
+balance:newBal
+};
+
+historyDiv.innerHTML = `<p>${entry.date} ${entry.type}$${entry.amount}</p>` + historyDiv.innerHTML;
+
+const ref = doc(db,"users",userId,"envelopes",currentEnvelopeId);
+const snap = await getDoc(ref);
+const data = snap.data();
+data.balance = newBal;
+data.history.push(entry);
+
+await setDoc(ref,data);
 }
+
+addMoneyBtn.onclick = () => changeBalance(true);
+spendMoneyBtn.onclick = () => changeBalance(false);
 
 });
 </script>
+
 </body>
 </html>
